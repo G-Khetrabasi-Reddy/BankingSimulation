@@ -1,3 +1,6 @@
-com\infosys\springboard\banksimulation\Config\DBConfig.class
 com\infosys\springboard\banksimulation\Main.class
+com\infosys\springboard\banksimulation\model\Transaction.class
+com\infosys\springboard\banksimulation\model\Account.class
 com\infosys\springboard\banksimulation\App.class
+com\infosys\springboard\banksimulation\config\DBConfig.class
+com\infosys\springboard\banksimulation\model\Customer.class

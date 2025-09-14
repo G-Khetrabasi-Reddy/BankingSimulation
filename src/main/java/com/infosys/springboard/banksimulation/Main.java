@@ -1,9 +1,10 @@
 package com.infosys.springboard.banksimulation;
 
-import com.infosys.springboard.banksimulation.Config.DBConfig;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+
+import com.infosys.springboard.banksimulation.config.DBConfig;
 
 public class Main {
     public static void main(String[] args) {
@@ -11,7 +12,7 @@ public class Main {
             Connection conn = DBConfig.getConnection();
 
             if (conn != null && !conn.isClosed()) {
-                System.out.println("✅ Database connected successfully!");
+                System.out.println("Database connected successfully!");
 
                 // Test query: show current database
                 Statement stmt = conn.createStatement();
@@ -23,7 +24,7 @@ public class Main {
 
                 conn.close(); // close connection after test
             } else {
-                System.out.println("❌ Failed to connect to the database.");
+                System.out.println("Failed to connect to the database.");
             }
         } catch (Exception e) {
             e.printStackTrace();
