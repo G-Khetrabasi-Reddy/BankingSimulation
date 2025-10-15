@@ -7,12 +7,13 @@ import org.bank.repository.CustomerRepository;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 
 public class CustomerRepositoryImpl implements CustomerRepository {
 
     @Override
-    public Customer addCustomer(Customer customer){
+    public Optional<Customer> addCustomer(Customer customer){
 
         String sql = "INSERT INTO customers (name, phoneNumber, email, address, customerPin, aadharNumber, dob, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -30,26 +31,26 @@ public class CustomerRepositoryImpl implements CustomerRepository {
             int affectedRows = stmt.executeUpdate();
 
             if(affectedRows == 0){
-                return null;
+                return Optional.empty();
             }
 
-            //Get the generated ID
+            //Get the generated Customer ID
             try(ResultSet rs = stmt.getGeneratedKeys()){
                 if(rs.next()){
-                    long generatedId = rs.getLong(1);
-                    customer.setCustomerId(generatedId); // set the auto-generated ID
-                    return  customer; // return customer with ID
+                    long generatedCustomerId = rs.getLong(1);
+                    customer.setCustomerId(generatedCustomerId); // set the auto-generated ID
+                    return Optional.of(customer); // return customer with ID
                 }
             }
 
         } catch (SQLException e) {
            handleSQLException(e);
         }
-        return null;
+        return Optional.empty();
     }
 
     @Override
-    public Customer findById(long customerId){
+    public Optional<Customer> findById(long customerId){
 
         String sql = "SELECT * FROM customers WHERE customerId = ?";
 
@@ -59,7 +60,7 @@ public class CustomerRepositoryImpl implements CustomerRepository {
             stmt.setLong(1, customerId);
             ResultSet rs = stmt.executeQuery();
             if(rs.next()){
-                return (new Customer(
+                return Optional.of((new Customer(
                         rs.getLong("customerId"),
                         rs.getString("name"),
                         rs.getString("phoneNumber"),
@@ -69,13 +70,13 @@ public class CustomerRepositoryImpl implements CustomerRepository {
                         rs.getString("aadharNumber"),
                         rs.getDate("dob").toLocalDate(),
                         rs.getString("status")
-                ));
+                )));
             }
         } catch (SQLException e) {
             handleSQLException(e);
         }
 
-        return null; //not found
+        return Optional.empty(); //not found
     }
 
     @Override

@@ -39,6 +39,7 @@ public class DBSetup {
                     accountType VARCHAR(50) NOT NULL,
                     accountName VARCHAR(100),
                     accountNumber VARCHAR(30) UNIQUE NOT NULL,
+                    ifscCode VARCHAR(11) NOT NULL,
                     status VARCHAR(20) NOT NULL,
                     FOREIGN KEY (customerId) REFERENCES customers(customerId)
                 );
@@ -47,46 +48,31 @@ public class DBSetup {
 
             // ---------------- Transactions Table ----------------
             String createTransactionsTable = """
-                CREATE TABLE IF NOT EXISTS transactions (
-                    transactionId BIGINT PRIMARY KEY AUTO_INCREMENT,
-                    accountId BIGINT NOT NULL,
-                    amount DECIMAL(15,2) NOT NULL,
-                    transactionType VARCHAR(20) NOT NULL, -- debited / credited
-                    transactionTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    transactionMode VARCHAR(30), -- debit, upi, credit card
-                    receiver_account_id BIGINT,
-                    sender_account_id BIGINT,
-                    FOREIGN KEY (accountId) REFERENCES accounts(accountId),
-                    FOREIGN KEY (receiver_account_id) REFERENCES accounts(accountId),
-                    FOREIGN KEY (sender_account_id) REFERENCES accounts(accountId)
+                CREATE TABLE transactions (
+                      transactionId BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                      senderAccountId BIGINT NOT NULL,
+                      receiverAccountId BIGINT NOT NULL,
+                      amount DECIMAL(15,2) NOT NULL,
+                      transactionMode VARCHAR(30) DEFAULT 'ONLINE',
+                      status VARCHAR(20) DEFAULT 'SUCCESS',
+                      transactionTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                      description TEXT,
+                      FOREIGN KEY (senderAccountId) REFERENCES accounts(accountId),
+                      FOREIGN KEY (receiverAccountId) REFERENCES accounts(accountId)
                 );
-                """;
+            """;
             stmt.executeUpdate(createTransactionsTable);
 
-            System.out.println("✅ Database setup complete: customers, accounts, transactions tables are ready.");
+            System.out.println("Database setup complete: customers, accounts, transactions tables are ready.");
 
         } catch (SQLException e) {
             e.printStackTrace();
-            throw new RuntimeException("❌ Failed to set up database: " + e.getMessage());
-        }
-    }
-
-    public static void setCustomerAutoIncrement() {
-        String setAutoIncrement = "ALTER TABLE customers AUTO_INCREMENT = 100001;";
-
-        try (Connection conn = DBConfig.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.executeUpdate(setAutoIncrement);
-            System.out.println("✅ Customer AUTO_INCREMENT set to 100001");
-        } catch (SQLException e) {
-            e.printStackTrace();
-            throw new RuntimeException("❌ Failed to set AUTO_INCREMENT: " + e.getMessage());
+            throw new RuntimeException("Failed to set up database: " + e.getMessage());
         }
     }
 
 
     public static void main(String[] args) {
         createTables();
-        setCustomerAutoIncrement();
     }
 }

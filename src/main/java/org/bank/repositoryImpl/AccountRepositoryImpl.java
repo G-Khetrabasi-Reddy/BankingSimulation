@@ -9,118 +9,205 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class AccountRepositoryImpl implements AccountRepository {
 
     @Override
-    public boolean addAccount(Account account) {
-        String sql = "INSERT INTO account (account_id, customer_id, created_at, modified_at, balance, account_type, account_name, account_number, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    public Optional<Account> addAccount(Account account) {
+        String sql = "INSERT INTO accounts (customerId, balance, accountType, accountName, accountNumber, status, ifscCode) VALUES (?, ?, ?, ?, ?, ?, ?)";
+
         try (Connection conn = DBConfig.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)){
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-            stmt.setLong(1, account.accountId());
-            stmt.setLong(2, account.customerId());
-            stmt.setTimestamp(3, Timestamp.valueOf(account.createdAt()));
-            stmt.setTimestamp(4, Timestamp.valueOf(account.modifiedAt()));
-            stmt.setDouble(5, account.balance());
-            stmt.setString(6, account.accountType());
-            stmt.setString(7, account.accountName());
-            stmt.setString(8, account.accountNumber());
-            stmt.setString(9, account.status());
+            stmt.setLong(1, account.getCustomerId());
+            stmt.setDouble(2, account.getBalance());
+            stmt.setString(3, account.getAccountType());
+            stmt.setString(4, account.getAccountName());
+            stmt.setString(5, account.getAccountNumber());
+            stmt.setString(6, account.getStatus());
+            stmt.setString(7, account.getIfscCode());
 
-            return stmt.executeUpdate() > 0;
-        }catch (SQLException e){
-            e.printStackTrace();
-            return false;
+            int affectedRows = stmt.executeUpdate();
+
+            if(affectedRows == 0){
+                return  null;
+            }
+
+            try(ResultSet rs = stmt.getGeneratedKeys()){
+                if(rs.next()){
+                    long accountId = rs.getLong(1);
+                    account.setAccountId(accountId);
+                    return findByAccountNumber(account.getAccountNumber());
+                }
+            }
+        } catch (SQLException e) {
+            handleSQLException(e);
         }
+        return Optional.empty();
     }
 
     @Override
-    public Account findById(long accountId) {
-        String sql = "SELECT * FROM account WHERE account_id = ?";
+    public Optional<Account> findByAccountNumber(String accountNumber) {
+        String sql = "SELECT * FROM accounts WHERE accountNumber = ?";
+
         try (Connection conn = DBConfig.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)){
-
-            stmt.setLong(1, accountId);
-            ResultSet rs = stmt.executeQuery();
-
-            if(rs.next()){
-                return mapToAccount(rs);
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, accountNumber);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) return Optional.of(mapToAccount(rs));
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            handleSQLException(e);
         }
-        return null;
+        return Optional.empty();
     }
 
     @Override
     public List<Account> findAll() {
-        String sql = "SELECT * FROM account";
+        String sql = "SELECT * FROM accounts";
+
         List<Account> accounts = new ArrayList<>();
 
-        try(Connection conn = DBConfig.getConnection();
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(sql)) {
+        try (Connection conn = DBConfig.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
                 accounts.add(mapToAccount(rs));
             }
-        } catch (SQLException e){
-            e.printStackTrace();
+        } catch (SQLException e) {
+            handleSQLException(e);
         }
         return accounts;
     }
 
     @Override
-    public boolean updateAccount(Account account) {
-        String sql = "UPDATE account SET modified_at = ?, balance = ?, account_type = ?, account_name = ?, account_number = ?, status = ? WHERE account_id = ?";
+    public  boolean updateBalance(String accountNumber, double newBalance) {
+        String sql = "UPDATE accounts SET balance = ? WHERE accountNumber = ?";
+
+        try(Connection conn = DBConfig.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setDouble(1, newBalance);
+            stmt.setString(2, accountNumber);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            handleSQLException(e);
+            return  false;
+        }
+    }
+
+
+    @Override
+    public boolean updateAccountDetails(Account account) {
+        String sql = "UPDATE accounts SET accountType = ?, accountName = ?, status = ?, ifscCode = ? WHERE accountNumber = ?";
         try (Connection conn = DBConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setTimestamp(1, Timestamp.valueOf(account.modifiedAt()));
-            stmt.setDouble(2, account.balance());
-            stmt.setString(3, account.accountType());
-            stmt.setString(4, account.accountName());
-            stmt.setString(5, account.accountNumber());
-            stmt.setString(6, account.status());
-            stmt.setLong(7, account.accountId());
+            stmt.setString(1, account.getAccountType());
+            stmt.setString(2, account.getAccountName());
+            stmt.setString(3, account.getStatus());
+            stmt.setString(4, account.getIfscCode());
+            stmt.setString(5, account.getAccountNumber());
 
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            e.printStackTrace();
+           handleSQLException(e);
             return false;
         }
     }
 
     @Override
-    public boolean deleteAccount(long accountId) {
-        String sql = "DELETE FROM account WHERE account_id = ?";
+    public boolean deleteAccount(String accountNumber) {
+        String sql = "DELETE FROM accounts WHERE accountNumber = ?";
         try (Connection conn = DBConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setLong(1, accountId);
+            stmt.setString(1, accountNumber);
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            e.printStackTrace();
+            handleSQLException(e);
             return false;
         }
     }
 
-    private Account mapToAccount(ResultSet rs)throws SQLException{
+    private Account mapToAccount(ResultSet rs) throws SQLException {
         return new Account(
-                rs.getLong("account_id"),
-                rs.getLong("customer_id"),
-                rs.getTimestamp("created_at").toLocalDateTime(),
-                rs.getTimestamp("modified_at").toLocalDateTime(),
+                rs.getLong("accountId"),
+                rs.getLong("customerId"),
+                rs.getObject("createdAt", LocalDateTime.class),
+                rs.getObject("modifiedAt", LocalDateTime.class),
                 rs.getDouble("balance"),
-                rs.getString("account_type"),
-                rs.getString("account_name"),
-                rs.getString("account_number"),
-                rs.getString("status")
+                rs.getString("accountType"),
+                rs.getString("accountName"),
+                rs.getString("accountNumber"),
+                rs.getString("status"),
+                rs.getString("ifscCode")
         );
     }
 
+    private void handleSQLException(SQLException e) {
+        // FK violation
+        if ("23000".equals(e.getSQLState()) && e.getErrorCode() == 1452) {
+            throw new RuntimeException("Customer does not exist. Cannot create account for customerId.");
+        }
+
+        String errorMessage = "Database error: " + e.getMessage()
+                + " [SQLState=" + e.getSQLState()
+                + ", ErrorCode=" + e.getErrorCode() + "]";
+        throw new RuntimeException(errorMessage, e);
+    }
+
+    // New methods for Transaction operation with Connection parameter
+
+    @Override
+    public Optional<Account> findByAccountNumber(Connection conn, String accountNumber) throws SQLException {
+        String sql = "SELECT * FROM accounts WHERE accountNumber = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, accountNumber);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapToAccount(rs));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public boolean updateBalance(Connection conn, String accountNumber, double newBalance) throws SQLException {
+        String sql = "UPDATE accounts SET balance = ? WHERE accountNumber = ?";
+
+        try(PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setDouble(1, newBalance);
+            stmt.setString(2, accountNumber);
+            return stmt.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public Optional<String> findAccountNumberById(long accountId) {
+        String sql = "SELECT accountNumber FROM accounts WHERE accountId = ?";
+
+        try (Connection conn = DBConfig.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setLong(1, accountId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return Optional.of(rs.getString("accountNumber"));
+            }
+
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+
+        return Optional.empty();
+    }
 }
